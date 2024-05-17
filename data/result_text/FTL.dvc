@@ -1,0 +1,6 @@
+outs:
+- md5: dca7133da3ff64282ccbc95656f18fda.dir
+  size: 71105
+  nfiles: 18
+  hash: md5
+  path: FTL

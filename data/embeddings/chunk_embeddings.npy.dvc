@@ -1,0 +1,5 @@
+outs:
+- md5: dad424737830605dbabef2d3edb84cd6
+  size: 21135488
+  hash: md5
+  path: chunk_embeddings.npy
