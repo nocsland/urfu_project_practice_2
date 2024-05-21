@@ -23,20 +23,27 @@ data_dir = './data/source_text/'
 
 
 # Функция для чтения данных из HTML-файлов
-def read_html_files(directory, num_files=10):
+def read_html_files(directory, num_files=1000):
     files = [f for f in os.listdir(directory) if f.endswith('.html')]
     # Выбираем минимум из num_files файлов или меньше, если их меньше
     selected_files = random.sample(files, min(len(files), num_files))
     articles = []
-    for filename in selected_files:
+    for filename in tqdm(selected_files,
+                         desc=f"Read HTML files from {directory}:"):
         filepath = os.path.join(directory, filename)
         with open(filepath, 'r', encoding='utf-8') as file:
             soup = BeautifulSoup(file, 'html.parser')
             title_tag = soup.find('title')
             if title_tag:
                 # Извлечение части заголовка до тире
-                title = title_tag.string.split(' - ')[0].strip()
+                title = title_tag.string.split(' - ')[0].strip()  # type: ignore # noqa: E501
                 title = title.split(';')[0].strip().replace('"', '')
+                title = title.replace('\xa0', ' ')
+                title = title.replace('/', ' ')
+                title = title.replace('_', ' ')
+                title = title.replace('  ', ' ')
+                title = title.replace('?', '')
+                # надо бы сделать на основе регулярных выражений
             else:
                 title = None
             text = soup.get_text(separator=' ')
@@ -61,6 +68,11 @@ def read_urls(directory):
         for line in lines:
             title = line.strip().split(';')[0].replace('"', '')
             title = title.split(' - ')[0].strip()
+            title = title.replace('\xa0', ' ')
+            title = title.replace('/', ' ')
+            title = title.replace('_', ' ')
+            title = title.replace('  ', ' ')
+            title = title.replace('?', '')
             url = line.strip().split(';')[-1]
             url_dict[title] = url
     return url_dict
@@ -78,7 +90,7 @@ def get_data():
 
     url_dict = read_urls(data_dir)
 
-    for article in all_articles:
+    for article in tqdm(all_articles, desc="Read URLs:"):
         title = article['title']
         if title in url_dict:
             article['url'] = url_dict[title]
@@ -109,7 +121,7 @@ def create_summary(text, num_sentences=1):
 
 # Чтение данных и их предобработка
 data = get_data()
-for article in tqdm(data, desc="Preprocess_text:"):
+for article in tqdm(data, desc="Preprocess data:"):
     article['cleaned_text'] = preprocess_text(article['text'])
     # article['summary'] = create_summary(article['cleaned_text'])
 
