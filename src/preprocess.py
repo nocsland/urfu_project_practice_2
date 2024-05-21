@@ -4,6 +4,7 @@ import pandas as pd
 import spacy
 import random
 from bs4 import BeautifulSoup
+from tqdm import tqdm
 
 # Установка фиксированного значения seed для воспроизводимости результатов
 random.seed(42)
@@ -24,55 +25,65 @@ data_dir = './data/source_text/'
 # Функция для чтения данных из HTML-файлов
 def read_html_files(directory, num_files=10):
     files = [f for f in os.listdir(directory) if f.endswith('.html')]
-    random.shuffle(files)
-    selected_files = files[:num_files]
+    # Выбираем минимум из num_files файлов или меньше, если их меньше
+    selected_files = random.sample(files, min(len(files), num_files))
     articles = []
     for filename in selected_files:
         filepath = os.path.join(directory, filename)
         with open(filepath, 'r', encoding='utf-8') as file:
             soup = BeautifulSoup(file, 'html.parser')
+            title_tag = soup.find('title')
+            if title_tag:
+                # Извлечение части заголовка до тире
+                title = title_tag.string.split(' - ')[0].strip()
+                title = title.split(';')[0].strip().replace('"', '')
+            else:
+                title = None
             text = soup.get_text(separator=' ')
-            articles.append({'filename': filename, 'text': text})
+            articles.append(
+                {'filename': filename, 'title': title, 'text': text})
     return articles
 
 
 # Функция для чтения URL-адресов из текстовых файлов
-def read_urls(file):
+def read_urls(directory):
     url_dict = {}
-    with open(file, 'rb') as f:
-        raw_data = f.read()
-    result = chardet.detect(raw_data)
-    encoding = result['encoding']
-    # print(encoding)
-    with open(file, 'r', encoding=encoding) as f:
-        lines = f.readlines()
-    for line in lines:
-        title = line.strip().split(';')[0]
-        url = line.strip().split(';')[1]
-        filename = title + '.html'
-        url_dict[filename] = {'title': title, 'url': url}
+    txt_files = [f for f in os.listdir(directory) if f.endswith('.txt')]
+    for txt_file in txt_files:
+        filepath = os.path.join(directory, txt_file)
+        with open(filepath, 'rb') as f:
+            raw_data = f.read()
+        result = chardet.detect(raw_data)
+        encoding = result['encoding']
+        # print(encoding)
+        with open(filepath, 'r', encoding=encoding) as f:
+            lines = f.readlines()
+        for line in lines:
+            title = line.strip().split(';')[0].replace('"', '')
+            title = title.split(' - ')[0].strip()
+            url = line.strip().split(';')[-1]
+            url_dict[title] = url
     return url_dict
 
 
 # Объединение данных из HTML-файлов и URL-адресов
 def get_data():
     all_articles = []
-    categories = ['CMK', 'DRK', 'FTL', 'FT', 'OTP']
-    for category in categories:
-        directory = os.path.join(data_dir, category)
+    # Получаем список всех поддиректорий
+    subdirs = next(os.walk(data_dir))[1]
+    for subdir in subdirs:
+        directory = os.path.join(data_dir, subdir)
         articles = read_html_files(directory)
-        url_file = os.path.join(data_dir, f"{category}.txt")
-        url_dict = read_urls(url_file)
-
-        for article in articles:
-            filename = article['filename']
-            if filename in url_dict:
-                article.update(url_dict[filename])
-            else:
-                article['title'] = None
-                article['url'] = None
-            article['category'] = category
         all_articles.extend(articles)
+
+    url_dict = read_urls(data_dir)
+
+    for article in all_articles:
+        title = article['title']
+        if title in url_dict:
+            article['url'] = url_dict[title]
+        else:
+            article['url'] = None
     return all_articles
 
 
@@ -83,8 +94,7 @@ def preprocess_text(text):
         token.lemma_
         for token in doc
         if not token.is_stop and not token.is_punct and not token.is_space]
-    cleaned_text = ' '.join(tokens)
-    cleaned_text = ' '.join(cleaned_text.split())
+    cleaned_text = ' '.join(tokens).strip()
     return cleaned_text
 
 
@@ -99,7 +109,7 @@ def create_summary(text, num_sentences=1):
 
 # Чтение данных и их предобработка
 data = get_data()
-for article in data:
+for article in tqdm(data, desc="Preprocess_text:"):
     article['cleaned_text'] = preprocess_text(article['text'])
     # article['summary'] = create_summary(article['cleaned_text'])
 
@@ -110,4 +120,10 @@ df = pd.DataFrame(data)
 os.makedirs('data/processed', exist_ok=True)
 
 # Сохранение предобработанных данных
-df.to_csv('data/processed/cleaned_data.csv', index=False)
+# df.to_csv('data/processed/cleaned_data.csv', index=False)
+df.to_json(
+    'data/processed/cleaned_data.json',
+    orient='records',
+    # lines=True,
+    force_ascii=False,
+    )
