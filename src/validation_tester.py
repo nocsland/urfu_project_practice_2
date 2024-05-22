@@ -15,6 +15,7 @@ def compare_and_score(validation_data, json_data):
     scores = defaultdict(int)
     total_weight = len(validation_data)
     for question, material in validation_data.items():
+        material = material.replace(';', '').replace('_', '')
         # print(question, material)
         # input()
         found = False
@@ -23,10 +24,10 @@ def compare_and_score(validation_data, json_data):
                 # print(item['question'])
                 # input()
                 for result in item['results']:
-                    # print(result)
+                    # print(result[0])
+                    # print(result[0].replace(';', '').replace('_', ''))
                     # input()
-                    if result[0].replace('_', ';') == material:
-                        # print(result[0])
+                    if result[0].replace(';', '').replace('_', '') == material:
                         # print(item['results'].index(result))
                         # input()
                         weight = 1 / (item['results'].index(result) + 1)
